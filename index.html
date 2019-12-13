@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<script src="./three.min.js"></script>
+<script src="./OrbitControls.js"></script>
+<script src="./MTLLoader.js"></script>
+<script src="./OBJLoader.js"></script>
+<style>
+    html, body, #container{
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+    }
+</style>
+
+<body>
+    <div id="container"></div>
+</body>
+
+<script>
+    //初始化
+    const container = document.querySelector('#container')
+    const {offsetWidth: width, offsetHeight: height} = container
+
+    const scene = new THREE.Scene()
+
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000)
+    camera.position.set(40, 40, 40)
+    camera.lookAt(scene.position)
+
+    const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true
+    })
+    renderer.setSize(width, height)
+    renderer.setClearColor(0x000000)
+    container.appendChild(renderer.domElement)
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement)
+    controls.autoRotate = true
+
+    //添加地球
+    const earth = new THREE.Mesh(
+        new THREE.SphereBufferGeometry(10, 40, 40),
+        new THREE.MeshBasicMaterial({
+            map: new THREE.TextureLoader().load('./earth.jpg')
+        })
+    )
+    scene.add(earth)
+
+    //添加灯光
+    const ambient = new THREE.AmbientLight(0xffffff)
+    scene.add(ambient)
+
+    //添加光晕
+    const flare = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+            map: new THREE.TextureLoader().load('./flare.png'),
+            depthTest: false
+        })
+    )
+    flare.scale.set(40, 40, 1)
+    scene.add(flare)
+
+    //添加光圈
+    const ring = new THREE.Mesh(
+        new THREE.PlaneBufferGeometry(70, 70),
+        new THREE.MeshBasicMaterial({
+            map: new THREE.TextureLoader().load('./ring.png'),
+            transparent: true
+        })
+    )
+    ring.rotateX(-Math.PI * 0.5)
+    scene.add(ring)
+
+    //添加月球
+    const moon = new THREE.Mesh(
+        new THREE.SphereBufferGeometry(2, 40, 40),
+        new THREE.MeshBasicMaterial({
+            map: new THREE.TextureLoader().load('./moon.jpeg')
+        })
+    )
+    moon.position.set(40, 0, 40)
+    scene.add(moon)
+
+    //添加文字
+    const generateTexture = (text, size) => {
+        const canvas = document.createElement('canvas')
+        const width = 256
+        const height = 128
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')
+        ctx.clearRect(0, 0, width, height)
+        ctx.font = size + "px bold 黑体"
+        ctx.fillStyle = "#fff"
+        ctx.textAlign = "center"
+        ctx.textBaseline = "middle"
+        ctx.fillText(text, width / 2, height / 2);
+
+        return new THREE.CanvasTexture(canvas)
+    }
+
+    //生成文字平面
+    const generatePlane = (text, color) => {
+        return new THREE.Mesh(
+            new THREE.PlaneBufferGeometry(6, 3),
+            new THREE.MeshBasicMaterial({
+                map: generateTexture(text, 30),
+                transparent: true,
+                depthTest: false,
+                color
+            })
+        )
+    }
+
+    //平面上加字
+    const textPlane = new THREE.Mesh(
+        new THREE.PlaneBufferGeometry(15, 15),
+        new THREE.MeshBasicMaterial({
+            color: 'green',
+            map: generateTexture('hahhahhahahah', 20),
+            transparent: true,
+            depthTest: false
+        })
+    )
+    textPlane.rotateX(-Math.PI * 0.5)
+    textPlane.rotateZ(Math.PI * 0.25)
+    textPlane.position.set(20, 0, 20)
+    scene.add(textPlane)
+
+    //添加卫星
+    new THREE.MTLLoader().load('./wx.mtl', (material) => {
+        material.preload()
+
+        new THREE.OBJLoader()
+        .setMaterials(material)
+        .load('./wx.obj', (obj) => {
+            obj.scale.set(0.02, 0.02, 0.02)
+            const positions = [
+                new THREE.Vector3(10, 4, 10),
+                new THREE.Vector3(20, -4, -20),
+                new THREE.Vector3(-15, 10, -15)
+            ]
+
+            for(const pos of positions){
+                const wx = obj.clone()
+
+                const wxGroup = new THREE.Group()
+                wxGroup.add(wx)
+                wxGroup.position.copy(pos)
+
+                const plane1 = generatePlane('test1', 'green')
+                plane1.position.set(4, 0, -2)
+                plane1.rotateY(Math.PI * 1.25)
+                const plane2 = generatePlane('test2', 'red')
+                plane2.position.set(-4, 0, -2)
+                plane2.rotateY(Math.PI * 0.75)
+
+                wxGroup.add(plane1, plane2)
+                wxGroup.lookAt(scene.position)
+                scene.add(wxGroup)
+            }
+        })
+    })
+
+    //渲染循环
+    const render = () => {
+        controls.update()
+        renderer.render(scene, camera)
+        requestAnimationFrame(render)
+    }
+
+    render()
+</script>
+</html>
